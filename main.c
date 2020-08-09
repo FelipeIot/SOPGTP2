@@ -15,23 +15,27 @@
 
 #define nbytesincomingserial 16
 #define timeSleepRead 0.01
+#define timeSleepTcp 0.01
 #define nPuertoSerial 1
 #define baudrate 115200
+#define bufferMaxSize 128
+#define uartBytePulsador 14
 
 
-char datoUpLoad;
+char datoUpLoad;//variable global que comparten los 2 hilos usada para pasar el pulsador presionado
+pthread_mutex_t mutexPulsador=PTHREAD_MUTEX_INITIALIZER;//protege la variable compartida datoUpLoad
 
 
-void init_tcp(void);
+
 
 void* Tcp_handle (void* message)
 {
 	socklen_t addr_len;
 	struct sockaddr_in clientaddr;
 	struct sockaddr_in serveraddr;
-	char buffer[128];
-	char bufferUpLoad[128];
-	char bufferDownLoad[128];
+	char buffer[bufferMaxSize];
+	char bufferUpLoad[bufferMaxSize];
+	char bufferDownLoad[bufferMaxSize];
 	int newfd;
 	int n;
 
@@ -100,6 +104,7 @@ void* Tcp_handle (void* message)
 		//printf("Recibi %d bytes.:%s\n",n,buffer);
 
 		// Enviamos mensaje a cliente
+		pthread_mutex_lock(&mutexPulsador);
 		if(datoUpLoad!=0x00)
 		{
 			
@@ -111,10 +116,10 @@ void* Tcp_handle (void* message)
 	    		}
 			datoUpLoad=0x00;
 		}
-
+		pthread_mutex_unlock(&mutexPulsador);
 		// Cerramos conexion con cliente
     		close(newfd);
-		sleep(0.1);
+		sleep(timeSleepTcp);
 	}
 
 	//return NULL;
@@ -122,31 +127,34 @@ void* Tcp_handle (void* message)
 
 void* Serial_handle (void* message)
 {
-	init_tcp();
+	
 	int32_t result;
 	int32_t datosin;
 	result = serial_open(nPuertoSerial,baudrate);
-	char bufferSerial[128];
+	char bufferSerial[bufferMaxSize];
 	
 	while(1)
 	{
-		sleep(timeSleepRead);		
-		datosin=serial_receive(bufferSerial,16);
+		sleep(timeSleepRead);//duermo el hilo para que el cpu haga otras cosas		
+		datosin=serial_receive(bufferSerial,16);//leo el puerto serial y lo almaceno en el buffer 
+				
 		if(datosin==nbytesincomingserial)
 		{
 			if(bufferSerial[0]=='>')
 			{			
 				uint32_t aux;				
 				bufferSerial[datosin]=0x00;
-				aux=bufferSerial[14]-'0';
-				if((aux>=0)&&(aux<=3))
+				aux=bufferSerial[uartBytePulsador]-'0';
+				pthread_mutex_lock(&mutexPulsador);
+				if((aux>=0)&&(aux<=3))//compruebo que los valores recibidos sean correctos '0'-'3' 
 				{
-					datoUpLoad=bufferSerial[14];
+					datoUpLoad=bufferSerial[uartBytePulsador];
 				}
 				else
 				{
 					datoUpLoad=0x00;
-				}			
+				}
+				pthread_mutex_unlock(&mutexPulsador);			
 				printf ("BOTON PRESIONADO NRO: %c\n", datoUpLoad);
 			}
 		}
@@ -159,6 +167,8 @@ int main(void)
 {
 	printf("Inicio Serial Service\r\n");
 	pthread_t SerialHandle, TcpHandel;
+	
+
 	const char *message1 = "Tcp";
 	const char *message2 = "Serial";
 	
@@ -166,7 +176,7 @@ int main(void)
 
 
 
-
+	//Creación de hilos
 
 	if((pthread_create (&SerialHandle, NULL, Serial_handle, (void *) message1))!=0)
 	{
@@ -178,7 +188,8 @@ int main(void)
 		printf("Error en la creacion hilo %s","serial");
 		exit(0);
 	}
-
+	
+	//Join de hilos
 	if((pthread_join (SerialHandle, NULL))!=0)
 	{
 		printf("Error join %s","serial");
@@ -196,12 +207,6 @@ int main(void)
 
 
 
-void init_tcp(void)
-{
-
-
-
-}
 
 
 
