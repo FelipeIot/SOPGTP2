@@ -42,18 +42,18 @@ void* Tcp_handle (void* message)
     	bzero((char*) &serveraddr, sizeof(serveraddr));
     	serveraddr.sin_family = AF_INET;
     	serveraddr.sin_port = htons(10000);
-    	//serveraddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
     	if(inet_pton(AF_INET, "127.0.0.1", &(serveraddr.sin_addr))<=0)
     	{
         	fprintf(stderr,"ERROR invalid server IP\r\n");
-        	return 1;
+        	//return 1;
     	}
 
 	// Abrimos puerto con bind()
 	if (bind(s, (struct sockaddr*)&serveraddr, sizeof(serveraddr)) == -1) {
 		close(s);
 		perror("listener: bind");
-		return 1;
+		//return 1;
 	}
 
 	// Seteamos socket en modo Listening
@@ -79,16 +79,6 @@ void* Tcp_handle (void* message)
 		printf  ("server:  conexion desde:  %s\n",ipClient);
 
 
-		// prueba cierre de conexion. El cliente recibira SIGPIPE.
-		//printf("presionar enter para salir\n");
-		//getchar();
-		//close(newfd);
-		//close(s);
-		//exit(1);
-		//_______________________________________________________
-
-		// Leemos mensaje de cliente
-		//if( (n = recv(newfd,buffer,128,0)) == -1 )
 		if( (n = read(newfd,buffer,128)) == -1 )
 		{
 			perror("Error leyendo mensaje en socket");
@@ -137,9 +127,7 @@ void* Serial_handle (void* message)
 	int32_t datosin;
 	result = serial_open(nPuertoSerial,baudrate);
 	char bufferSerial[128];
-	//sprintf(bufferSerial,"%s","hola mundo");
-
-	//serial_send(bufferSerial,sizeof(bufferSerial));	
+	
 	while(1)
 	{
 		sleep(timeSleepRead);		
@@ -159,7 +147,7 @@ void* Serial_handle (void* message)
 				{
 					datoUpLoad=0x00;
 				}			
-				printf ("%c\n", datoUpLoad);
+				printf ("BOTON PRESIONADO NRO: %c\n", datoUpLoad);
 			}
 		}
 		
