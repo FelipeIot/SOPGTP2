@@ -13,6 +13,16 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <fcntl.h>
+
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <signal.h>
+
 #define nbytesincomingserial 16
 #define timeSleepRead 0.01
 #define timeSleepTcp 0.01
@@ -23,8 +33,25 @@
 
 
 char datoUpLoad;//variable global que comparten los 2 hilos usada para pasar el pulsador presionado
-pthread_mutex_t mutexPulsador=PTHREAD_MUTEX_INITIALIZER;//protege la variable compartida datoUpLoad
 
+pthread_mutex_t mutexPulsador=PTHREAD_MUTEX_INITIALIZER;//protege la variable compartida datoUpLoad
+static pthread_t SerialHandle, TcpHandel; //hilos
+
+void bloquearSign(void);
+void desbloquearSign(void);
+
+void manejoInt(int sig)
+{
+	int aux;
+	aux=pthread_cancel(SerialHandle);
+	aux=pthread_cancel(TcpHandel);
+}
+void manejoTerm(int sig)
+{
+	int aux;	
+	aux=pthread_cancel(SerialHandle);
+	aux=pthread_cancel(TcpHandel);
+}
 
 
 
@@ -165,8 +192,28 @@ void* Serial_handle (void* message)
 
 int main(void)
 {
+	
+	//Configuración de receptores de señales del sistema
+	struct sigaction sa;
+	
+	sa.sa_handler = manejoInt;
+	sa.sa_flags = 0; 
+	sigemptyset(&sa.sa_mask);
+
+	sigaction(SIGINT,&sa,NULL);
+
+        struct sigaction se;
+        se.sa_handler = manejoTerm;
+        se.sa_flags = 0; 
+        sigemptyset(&se.sa_mask);
+
+        sigaction(SIGTERM,&se,NULL);   
+
+
+
+
 	printf("Inicio Serial Service\r\n");
-	pthread_t SerialHandle, TcpHandel;
+	
 	
 
 	const char *message1 = "Tcp";
@@ -175,7 +222,7 @@ int main(void)
 
 
 
-
+	bloquearSign();//bloqueo las signasl
 	//Creación de hilos
 
 	if((pthread_create (&SerialHandle, NULL, Serial_handle, (void *) message1))!=0)
@@ -188,6 +235,7 @@ int main(void)
 		printf("Error en la creacion hilo %s","serial");
 		exit(0);
 	}
+	desbloquearSign();//desbloqueo las signasl
 	
 	//Join de hilos
 	if((pthread_join (SerialHandle, NULL))!=0)
@@ -200,11 +248,30 @@ int main(void)
 		printf("Error join %s","tcp");
 		exit(0);	
 	}
-	
+	printf("SALIDA CORRECTA\n\r");
 	exit(EXIT_SUCCESS);
 	return 0;
 }
 
+void bloquearSign(void)
+{
+	sigset_t set;
+ 	int s;
+ 	sigemptyset(&set);
+ 	sigaddset(&set, SIGINT);
+ 	sigaddset(&set, SIGTERM);
+ 	pthread_sigmask(SIG_BLOCK, &set,NULL);
+}
+
+void desbloquearSign(void)
+{
+ 	sigset_t set;
+ 	int s;
+ 	sigemptyset(&set);
+ 	sigaddset(&set, SIGINT);
+ 	sigaddset(&set, SIGTERM);
+ 	pthread_sigmask(SIG_UNBLOCK, &set,NULL);
+}
 
 
 
