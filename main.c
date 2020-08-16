@@ -34,23 +34,35 @@
 
 char datoUpLoad;//variable global que comparten los 2 hilos usada para pasar el pulsador presionado
 
-pthread_mutex_t mutexPulsador=PTHREAD_MUTEX_INITIALIZER;//protege la variable compartida datoUpLoad
+//pthread_mutex_t mutexPulsador=PTHREAD_MUTEX_INITIALIZER;//protege la variable compartida datoUpLoad
 static pthread_t SerialHandle, TcpHandel; //hilos
 
 void bloquearSign(void);
 void desbloquearSign(void);
+int newfd;
 
 void manejoInt(int sig)
 {
-	int aux;
-	aux=pthread_cancel(SerialHandle);
-	aux=pthread_cancel(TcpHandel);
+	
+	if((pthread_cancel(SerialHandle))!=0)
+	{
+		perror("Error al cerrar el hilo serial");	
+	}
+	if((pthread_cancel(TcpHandel))!=0)
+	{
+		perror("Error al cerrar el hilo tcp");
+	}
 }
 void manejoTerm(int sig)
 {
-	int aux;	
-	aux=pthread_cancel(SerialHandle);
-	aux=pthread_cancel(TcpHandel);
+	if((pthread_cancel(SerialHandle))!=0)
+	{
+		perror("Error al cerrar el hilo serial");	
+	}
+	if((pthread_cancel(TcpHandel))!=0)
+	{
+		perror("Error al cerrar el hilo tcp");
+	}
 }
 
 
@@ -61,9 +73,9 @@ void* Tcp_handle (void* message)
 	struct sockaddr_in clientaddr;
 	struct sockaddr_in serveraddr;
 	char buffer[bufferMaxSize];
-	char bufferUpLoad[bufferMaxSize];
+	//char bufferUpLoad[bufferMaxSize];
 	char bufferDownLoad[bufferMaxSize];
-	int newfd;
+	//int newfd;
 	int n;
 
 	// Creamos socket
@@ -97,6 +109,7 @@ void* Tcp_handle (void* message)
 	while(1)
 	{
 		// Ejecutamos accept() para recibir conexiones entrantes
+		
 		addr_len = sizeof(struct sockaddr_in);
     		if ( (newfd = accept(s, (struct sockaddr *)&clientaddr, 
                                         &addr_len)) == -1)
@@ -109,42 +122,30 @@ void* Tcp_handle (void* message)
 		inet_ntop(AF_INET, &(clientaddr.sin_addr), ipClient, sizeof(ipClient));
 		printf  ("server:  conexion desde:  %s\n",ipClient);
 
-
-		if( (n = read(newfd,buffer,128)) == -1 )
+		while(1)
 		{
-			perror("Error leyendo mensaje en socket");
-			exit(1);
-		}
-		else
-		{
-			if(buffer[0]==':')
+			if( (n = read(newfd,buffer,128))<=0 )
 			{
-				sprintf(bufferDownLoad,">OUTS:%c,%c,%c,%c\r\n",buffer[7],buffer[8],buffer[9],buffer[10]);
-				bufferDownLoad[15]=0x00;
-				serial_send(bufferDownLoad,16);
-				printf("%s",bufferDownLoad);
+				perror("Error leyendo mensaje en socket");
+				//exit(1);
+				break;
 			}
+			else
+			{
+				if(buffer[0]==':')
+				{
+										
+					sprintf(bufferDownLoad,">OUTS:%c,%c,%c,%c\r\n",buffer[7],buffer[8],buffer[9],buffer[10]);
+					bufferDownLoad[15]=0x00;
+					serial_send(bufferDownLoad,16);
+					printf("%s",bufferDownLoad);
+					
+				}
+			}
+
+			buffer[n]=0x00;
 		}
 
-		buffer[n]=0x00;
-
-		//printf("Recibi %d bytes.:%s\n",n,buffer);
-
-		// Enviamos mensaje a cliente
-		pthread_mutex_lock(&mutexPulsador);
-		if(datoUpLoad!=0x00)
-		{
-			
-			sprintf(bufferUpLoad,":LINE%cTG\n",datoUpLoad);
-	    		if (write (newfd, bufferUpLoad, 11) == -1)
-	    		{
-	      			perror("Error escribiendo mensaje en socket");
-	      			exit (1);
-	    		}
-			datoUpLoad=0x00;
-		}
-		pthread_mutex_unlock(&mutexPulsador);
-		// Cerramos conexion con cliente
     		close(newfd);
 		sleep(timeSleepTcp);
 	}
@@ -159,6 +160,7 @@ void* Serial_handle (void* message)
 	int32_t datosin;
 	result = serial_open(nPuertoSerial,baudrate);
 	char bufferSerial[bufferMaxSize];
+	char bufferUpLoad[bufferMaxSize];
 	
 	while(1)
 	{
@@ -172,16 +174,22 @@ void* Serial_handle (void* message)
 				uint32_t aux;				
 				bufferSerial[datosin]=0x00;
 				aux=bufferSerial[uartBytePulsador]-'0';
-				pthread_mutex_lock(&mutexPulsador);
+			
 				if((aux>=0)&&(aux<=3))//compruebo que los valores recibidos sean correctos '0'-'3' 
 				{
 					datoUpLoad=bufferSerial[uartBytePulsador];
+					sprintf(bufferUpLoad,":LINE%cTG\n",datoUpLoad);
+			    		if (write (newfd, bufferUpLoad, 11) == -1)
+			    		{
+			      			perror("Error escribiendo mensaje en socket");
+			      			exit (1);
+			    		}
 				}
 				else
 				{
 					datoUpLoad=0x00;
 				}
-				pthread_mutex_unlock(&mutexPulsador);			
+						
 				printf ("BOTON PRESIONADO NRO: %c\n", datoUpLoad);
 			}
 		}
@@ -248,7 +256,9 @@ int main(void)
 		printf("Error join %s","tcp");
 		exit(0);	
 	}
+	close(newfd);
 	printf("SALIDA CORRECTA\n\r");
+
 	exit(EXIT_SUCCESS);
 	return 0;
 }
