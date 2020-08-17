@@ -39,29 +39,32 @@ void bloquearSign(void);
 void desbloquearSign(void);
 int newfd;
 int newfdserial=-1;
+volatile sig_atomic_t banderaSignInt=0;
+volatile sig_atomic_t banderaSignTerm=0;
 
 void manejoInt(int sig)
 {
-	
-	if((pthread_cancel(SerialHandle))!=0)
+	banderaSignInt=1;
+	/*if((pthread_cancel(SerialHandle))!=0)
 	{
 		perror("Error al cerrar el hilo serial");	
 	}
 	if((pthread_cancel(TcpHandel))!=0)
 	{
 		perror("Error al cerrar el hilo tcp");
-	}
+	}*/
 }
 void manejoTerm(int sig)
 {
-	if((pthread_cancel(SerialHandle))!=0)
+	banderaSignTerm=1;
+	/*if((pthread_cancel(SerialHandle))!=0)
 	{
 		perror("Error al cerrar el hilo serial");	
 	}
 	if((pthread_cancel(TcpHandel))!=0)
 	{
 		perror("Error al cerrar el hilo tcp");
-	}
+	}*/
 }
 
 
@@ -267,12 +270,32 @@ int main(void)
 		exit(0);
 	}
 	desbloquearSign();//desbloqueo las signasl
-	
-	//Join de hilos
+
+	while(1)
+	{
+		sleep(0.01);
+		if(banderaSignInt||banderaSignTerm)
+		{
+			break;
+		}
+	}
+
+
+	if((pthread_cancel(SerialHandle))!=0)
+	{
+		perror("Error al cerrar el hilo serial");	
+	}
+
 	if((pthread_join (SerialHandle, NULL))!=0)
 	{
 		printf("Error join %s","serial");
 		exit(0);	
+	}
+
+
+	if((pthread_cancel(TcpHandel))!=0)
+	{
+		perror("Error al cerrar el hilo tcp");
 	}
 	if((pthread_join (TcpHandel, NULL))!=0)
 	{
