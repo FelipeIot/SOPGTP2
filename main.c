@@ -23,13 +23,13 @@
 #include <stdint.h>
 #include <signal.h>
 
-#define nbytesincomingserial 16
-#define timeSleepRead 0.01
-#define timeSleepTcp 0.01
-#define nPuertoSerial 1
-#define baudrate 115200
-#define bufferMaxSize 128
-#define uartBytePulsador 14
+#define NBYTESINCOMINGSERIAL 16
+#define TIMESLEEPREAD 0.01
+#define TIMESLEEPTCP 0.01
+#define NPUERTOSERIAL 1
+#define BAUDRATE 115200
+#define BUFFERMAXSIZE 128
+#define UARTBPULSADOR 14
 
 
 char datoUpLoad;//variable global que comparten los 2 hilos usada para pasar el pulsador presionado
@@ -72,9 +72,9 @@ void* Tcp_handle (void* message)
 	socklen_t addr_len;
 	struct sockaddr_in clientaddr;
 	struct sockaddr_in serveraddr;
-	char buffer[bufferMaxSize];
-	//char bufferUpLoad[bufferMaxSize];
-	char bufferDownLoad[bufferMaxSize];
+	char buffer[BUFFERMAXSIZE];
+	//char bufferUpLoad[BUFFERMAXSIZE];
+	char bufferDownLoad[BUFFERMAXSIZE];
 	//int newfd;
 	int n;
 
@@ -124,7 +124,7 @@ void* Tcp_handle (void* message)
 
 		while(1)
 		{
-			if( (n = read(newfd,buffer,128))<=0 )
+			if( (n = read(newfd,buffer,BUFFERMAXSIZE))<=0 )
 			{
 				perror("Error leyendo mensaje en socket");
 				//exit(1);
@@ -147,7 +147,7 @@ void* Tcp_handle (void* message)
 		}
 
     		close(newfd);
-		sleep(timeSleepTcp);
+		sleep(TIMESLEEPTCP);
 	}
 
 	//return NULL;
@@ -158,26 +158,26 @@ void* Serial_handle (void* message)
 	
 	int32_t result;
 	int32_t datosin;
-	result = serial_open(nPuertoSerial,baudrate);
-	char bufferSerial[bufferMaxSize];
-	char bufferUpLoad[bufferMaxSize];
+	result = serial_open(NPUERTOSERIAL,BAUDRATE);
+	char bufferSerial[BUFFERMAXSIZE];
+	char bufferUpLoad[BUFFERMAXSIZE];
 	
 	while(1)
 	{
-		sleep(timeSleepRead);//duermo el hilo para que el cpu haga otras cosas		
+		sleep(TIMESLEEPREAD);//duermo el hilo para que el cpu haga otras cosas		
 		datosin=serial_receive(bufferSerial,16);//leo el puerto serial y lo almaceno en el buffer 
 				
-		if(datosin==nbytesincomingserial)
+		if(datosin==NBYTESINCOMINGSERIAL)
 		{
 			if(bufferSerial[0]=='>')
 			{			
 				uint32_t aux;				
 				bufferSerial[datosin]=0x00;
-				aux=bufferSerial[uartBytePulsador]-'0';
+				aux=bufferSerial[UARTBPULSADOR]-'0';
 			
 				if((aux>=0)&&(aux<=3))//compruebo que los valores recibidos sean correctos '0'-'3' 
 				{
-					datoUpLoad=bufferSerial[uartBytePulsador];
+					datoUpLoad=bufferSerial[UARTBPULSADOR];
 					sprintf(bufferUpLoad,":LINE%cTG\n",datoUpLoad);
 			    		if (write (newfd, bufferUpLoad, 11) == -1)
 			    		{
