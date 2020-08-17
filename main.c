@@ -77,9 +77,13 @@ void* Tcp_handle (void* message)
 	char bufferDownLoad[BUFFERMAXSIZE];
 	//int newfd;
 	int n;
+	int s;
 
 	// Creamos socket
-	int s = socket(AF_INET,SOCK_STREAM, 0);
+	 if((s = socket(AF_INET,SOCK_STREAM, 0))==-1)
+	 {
+		 perror("Creación de socket");
+	 }
 
 	// Cargamos datos de IP:PORT del server
     	bzero((char*) &serveraddr, sizeof(serveraddr));
