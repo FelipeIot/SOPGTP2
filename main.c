@@ -212,14 +212,21 @@ int main(void)
 	sa.sa_flags = 0; 
 	sigemptyset(&sa.sa_mask);
 
-	sigaction(SIGINT,&sa,NULL);
+	if(sigaction(SIGINT,&sa,NULL)==-1)
+	{
+		perror("error en sigint");
+	}
 
-        struct sigaction se;
-        se.sa_handler = manejoTerm;
-        se.sa_flags = 0; 
-        sigemptyset(&se.sa_mask);
+    struct sigaction se;
+ 	se.sa_handler = manejoTerm;
+    se.sa_flags = 0; 
+    sigemptyset(&se.sa_mask);
 
-        sigaction(SIGTERM,&se,NULL);   
+	   
+	if(sigaction(SIGTERM,&se,NULL)==-1)
+	{
+		perror("error en sigint");
+	}
 
 
 
