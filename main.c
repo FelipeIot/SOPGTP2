@@ -24,22 +24,21 @@
 #include <signal.h>
 
 #define NBYTESINCOMINGSERIAL 16
-#define TIMESLEEPREAD 0.01
-#define TIMESLEEPTCP 0.01
-#define NPUERTOSERIAL 1
-#define BAUDRATE 115200
-#define BUFFERMAXSIZE 128
-#define UARTBPULSADOR 14
+#define TIMESLEEPREAD 		0.01
+#define TIMESLEEPTCP 		0.01
+#define NPUERTOSERIAL 		1
+#define BAUDRATE 			115200
+#define BUFFERMAXSIZE 		128
+#define UARTBPULSADOR 		14
 
 
-char datoUpLoad;//variable global que comparten los 2 hilos usada para pasar el pulsador presionado
-
-//pthread_mutex_t mutexPulsador=PTHREAD_MUTEX_INITIALIZER;//protege la variable compartida datoUpLoad
+pthread_mutex_t mutexNewfd=PTHREAD_MUTEX_INITIALIZER;//protege la variable compartida newfd
 static pthread_t SerialHandle, TcpHandel; //hilos
 
 void bloquearSign(void);
 void desbloquearSign(void);
 int newfd;
+int newfdserial=-1;
 
 void manejoInt(int sig)
 {
@@ -86,15 +85,15 @@ void* Tcp_handle (void* message)
 	 }
 
 	// Cargamos datos de IP:PORT del server
-    	bzero((char*) &serveraddr, sizeof(serveraddr));
-    	serveraddr.sin_family = AF_INET;
-    	serveraddr.sin_port = htons(10000);
+    bzero((char*) &serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_port = htons(10000);
 
-    	if(inet_pton(AF_INET, "127.0.0.1", &(serveraddr.sin_addr))<=0)
-    	{
-        	fprintf(stderr,"ERROR invalid server IP\r\n");
+    if(inet_pton(AF_INET, "127.0.0.1", &(serveraddr.sin_addr))<=0)
+    {
+    	fprintf(stderr,"ERROR invalid server IP\r\n");
         	//return 1;
-    	}
+    }
 
 	// Abrimos puerto con bind()
 	if (bind(s, (struct sockaddr*)&serveraddr, sizeof(serveraddr)) == -1) {
@@ -136,9 +135,12 @@ void* Tcp_handle (void* message)
 			}
 			else
 			{
+
 				if(buffer[0]==':')
 				{
-										
+					pthread_mutex_lock (&mutexNewfd);
+						newfdserial=newfd;	
+					pthread_mutex_unlock (&mutexNewfd);			
 					sprintf(bufferDownLoad,">OUTS:%c,%c,%c,%c\r\n",buffer[7],buffer[8],buffer[9],buffer[10]);
 					bufferDownLoad[15]=0x00;
 					serial_send(bufferDownLoad,16);
@@ -146,11 +148,15 @@ void* Tcp_handle (void* message)
 					
 				}
 			}
+			
 
 			buffer[n]=0x00;
 		}
-
-    		close(newfd);
+		pthread_mutex_lock (&mutexNewfd);
+			close(newfd);
+			newfdserial=-1;
+		pthread_mutex_unlock (&mutexNewfd);
+    		
 		sleep(TIMESLEEPTCP);
 	}
 
@@ -162,6 +168,7 @@ void* Serial_handle (void* message)
 	
 	int32_t result;
 	int32_t datosin;
+	char datoUpLoad;
 	result = serial_open(NPUERTOSERIAL,BAUDRATE);
 	char bufferSerial[BUFFERMAXSIZE];
 	char bufferUpLoad[BUFFERMAXSIZE];
@@ -183,11 +190,16 @@ void* Serial_handle (void* message)
 				{
 					datoUpLoad=bufferSerial[UARTBPULSADOR];
 					sprintf(bufferUpLoad,":LINE%cTG\n",datoUpLoad);
-			    		if (write (newfd, bufferUpLoad, 11) == -1)
+					pthread_mutex_lock (&mutexNewfd);
+					if(newfdserial!=-1)
+					{
+			    		if (write (newfdserial, bufferUpLoad, 11) == -1)
 			    		{
 			      			perror("Error escribiendo mensaje en socket");
 			      			exit (1);
 			    		}
+					}
+					pthread_mutex_unlock (&mutexNewfd);
 				}
 				else
 				{
